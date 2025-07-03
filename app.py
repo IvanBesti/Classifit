@@ -9,48 +9,47 @@ TF_AVAILABLE = False
 INTERPRETER = None
 
 def initialize_model():
-    """Initialize TensorFlow model with fast fallback for deployment"""
+    """Initialize TensorFlow model with smart fallback"""
     global TF_AVAILABLE, INTERPRETER
     
-    # Quick check for deployment environment
-    is_deployment = os.getenv('STREAMLIT_SHARING_MODE') or os.getenv('STREAMLIT_CLOUD')
-    
-    # In deployment, prefer demo mode for faster startup
-    if is_deployment:
-        return "demo_mode"
-    
-    # For local development, try to load model
+    # Try to load model (both local and deployment)
     try:
-        # First, try tflite-runtime (lighter)
+        model_path = "tflite/model.tflite"
+        
+        # Check if model file exists
+        if not os.path.exists(model_path):
+            return "demo_mode"
+        
+        # First, try tflite-runtime (lighter for deployment)
         try:
             import tflite_runtime.interpreter as tflite
-            model_path = "tflite/model.tflite"
-            
-            if os.path.exists(model_path):
-                INTERPRETER = tflite.Interpreter(model_path=model_path)
-                INTERPRETER.allocate_tensors()
-                TF_AVAILABLE = True
-                return "tflite_runtime"
+            INTERPRETER = tflite.Interpreter(model_path=model_path)
+            INTERPRETER.allocate_tensors()
+            TF_AVAILABLE = True
+            return "tflite_runtime"
         except ImportError:
+            pass
+        except Exception:
+            # If tflite-runtime fails to load model, try tensorflow
             pass
         
         # Fallback to tensorflow.lite
         try:
             import tensorflow as tf
-            model_path = "tflite/model.tflite"
-            
-            if os.path.exists(model_path):
-                INTERPRETER = tf.lite.Interpreter(model_path=model_path)
-                INTERPRETER.allocate_tensors()
-                TF_AVAILABLE = True
-                return "tensorflow"
+            INTERPRETER = tf.lite.Interpreter(model_path=model_path)
+            INTERPRETER.allocate_tensors()
+            TF_AVAILABLE = True
+            return "tensorflow"
         except ImportError:
+            pass
+        except Exception:
+            # If tensorflow also fails, go to demo mode
             pass
             
     except Exception:
         pass
     
-    # Default to demo mode
+    # Default to demo mode if all attempts fail
     return "demo_mode"
 
 # Initialize model status (lazy loading to avoid blocking)

@@ -9,47 +9,84 @@ TF_AVAILABLE = False
 INTERPRETER = None
 
 def initialize_model():
-    """Initialize TensorFlow model with smart fallback"""
+    """Initialize TensorFlow model with smart fallback and debugging"""
     global TF_AVAILABLE, INTERPRETER
     
-    # Try to load model (both local and deployment)
+    # Debug info for deployment troubleshooting
+    debug_info = []
+    
     try:
         model_path = "tflite/model.tflite"
         
         # Check if model file exists
         if not os.path.exists(model_path):
+            debug_info.append(f"❌ Model file not found: {model_path}")
+            debug_info.append(f"📁 Current directory: {os.getcwd()}")
+            debug_info.append(f"📁 Files in current dir: {os.listdir('.')}")
+            if os.path.exists('tflite'):
+                debug_info.append(f"📁 Files in tflite/: {os.listdir('tflite')}")
+            
+            # Store debug info for later display
+            if hasattr(st, 'session_state'):
+                st.session_state.debug_info = debug_info
             return "demo_mode"
         
-        # First, try tflite-runtime (lighter for deployment)
-        try:
-            import tflite_runtime.interpreter as tflite
-            INTERPRETER = tflite.Interpreter(model_path=model_path)
-            INTERPRETER.allocate_tensors()
-            TF_AVAILABLE = True
-            return "tflite_runtime"
-        except ImportError:
-            pass
-        except Exception:
-            # If tflite-runtime fails to load model, try tensorflow
-            pass
-        
-        # Fallback to tensorflow.lite
+        # Check TensorFlow availability first
         try:
             import tensorflow as tf
+            debug_info.append(f"✅ TensorFlow {tf.__version__} imported successfully")
+            
+            # Try to load model with TensorFlow Lite
             INTERPRETER = tf.lite.Interpreter(model_path=model_path)
             INTERPRETER.allocate_tensors()
             TF_AVAILABLE = True
-            return "tensorflow"
-        except ImportError:
-            pass
-        except Exception:
-            # If tensorflow also fails, go to demo mode
-            pass
             
-    except Exception:
-        pass
+            # Get model info for debugging
+            input_details = INTERPRETER.get_input_details()
+            output_details = INTERPRETER.get_output_details()
+            debug_info.append(f"✅ Model loaded - Input: {input_details[0]['shape']}, Output: {output_details[0]['shape']}")
+            
+            # Store debug info for later display
+            if hasattr(st, 'session_state'):
+                st.session_state.debug_info = debug_info
+            
+            return "tensorflow"
+            
+        except ImportError as e:
+            debug_info.append(f"❌ TensorFlow import failed: {str(e)}")
+        except Exception as e:
+            debug_info.append(f"❌ TensorFlow model loading failed: {str(e)}")
+        
+        # Try tflite-runtime as fallback
+        try:
+            import tflite_runtime.interpreter as tflite
+            debug_info.append("✅ TFLite Runtime imported successfully")
+            
+            INTERPRETER = tflite.Interpreter(model_path=model_path)
+            INTERPRETER.allocate_tensors()
+            TF_AVAILABLE = True
+            
+            debug_info.append("✅ Model loaded with TFLite Runtime")
+            
+            # Store debug info for later display
+            if hasattr(st, 'session_state'):
+                st.session_state.debug_info = debug_info
+            
+            return "tflite_runtime"
+            
+        except ImportError as e:
+            debug_info.append(f"❌ TFLite Runtime import failed: {str(e)}")
+        except Exception as e:
+            debug_info.append(f"❌ TFLite Runtime model loading failed: {str(e)}")
+            
+    except Exception as e:
+        debug_info.append(f"❌ General error in model initialization: {str(e)}")
     
-    # Default to demo mode if all attempts fail
+    # Store debug info for demo mode
+    debug_info.append("🎭 Falling back to demo mode")
+    if hasattr(st, 'session_state'):
+        st.session_state.debug_info = debug_info
+    
     return "demo_mode"
 
 # Initialize model status (lazy loading to avoid blocking)
@@ -704,6 +741,18 @@ def main():
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Show debug information if available
+            if hasattr(st.session_state, 'debug_info') and st.session_state.debug_info:
+                with st.expander("🔧 Debug Information"):
+                    for info in st.session_state.debug_info:
+                        st.markdown(f"**{info}**")
+                        
+        # Show debug info for successful model loading too
+        elif hasattr(st.session_state, 'debug_info') and st.session_state.debug_info:
+            with st.expander("🔧 Model Loading Debug"):
+                for info in st.session_state.debug_info:
+                    st.markdown(f"**{info}**")
     
     # Main content area
     col1, col2 = st.columns([1, 1], gap="large")

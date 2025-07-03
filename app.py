@@ -12,11 +12,12 @@ def initialize_model():
     """Initialize TensorFlow model with fast fallback for deployment"""
     global TF_AVAILABLE, INTERPRETER
     
-    # Quick check for deployment environment (but still try to load model)
+    # Quick check for deployment environment
     is_deployment = os.getenv('STREAMLIT_SHARING_MODE') or os.getenv('STREAMLIT_CLOUD')
     
-    # Even in deployment, try to load model first (tensorflow-cpu is now included)
-    # Fallback to demo mode only if model loading fails
+    # In deployment, prefer demo mode for faster startup
+    if is_deployment:
+        return "demo_mode"
     
     # For local development, try to load model
     try:

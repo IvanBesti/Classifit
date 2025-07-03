@@ -58,8 +58,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/yourusername/classifit',
-        'Report a bug': 'https://github.com/yourusername/classifit/issues',
+        'Get Help': 'mailto:support@classifit.com',
+        'Report a bug': 'mailto:bugs@classifit.com',
         'About': """
         # CLASSIFIT v2.0.0
         
@@ -674,8 +674,20 @@ def main():
             st.markdown("### ℹ️ Demo Mode Info")
             st.markdown("""
             <div class="info-box">
-                Running in demo mode because TensorFlow is not available in this environment. 
-                The app will show simulated predictions to demonstrate the UI and functionality.
+                <div style="color: var(--text-color) !important; font-size: 0.9rem; line-height: 1.6;">
+                    <strong style="color: var(--text-color) !important;">🎭 Demo Mode Active</strong><br>
+                    <span style="color: var(--text-secondary) !important;">
+                    TensorFlow is not available in this deployment environment. 
+                    The app shows realistic simulated predictions to demonstrate the UI and functionality.
+                    </span><br><br>
+                    <strong style="color: var(--text-color) !important;">📱 Full Features Available:</strong><br>
+                    <span style="color: var(--text-secondary) !important;">
+                    • Complete user interface<br>
+                    • Image upload and processing<br>
+                    • Realistic prediction simulation<br>
+                    • All visual components working
+                    </span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
     

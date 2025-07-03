@@ -6,8 +6,8 @@ import os
 
 # Set page config
 st.set_page_config(
-    page_title="🧠 Klasifikasi Citra Intel",
-    page_icon="🧠",
+    page_title="CLASSIFIT - Klasifikasi Citra Intel",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -122,14 +122,153 @@ def predict_image(model, image_array, labels):
         return None, None, None
 
 def main():
-    # Title and description
-    st.title("🧠 Klasifikasi Citra Intel dengan CNN")
+    # Custom CSS for better styling with dark/light mode compatibility
     st.markdown("""
-    **Aplikasi web untuk mengklasifikasikan gambar menggunakan Transfer Learning (MobileNetV2)**
+    <style>
+    .main-header {
+        text-align: center;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+    .main-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: white;
+        margin: 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .subtitle {
+        font-size: 1.2rem;
+        color: #f0f0f0;
+        margin-top: 0.5rem;
+        margin-bottom: 0;
+    }
+    .category-tag {
+        display: inline-block;
+        background: var(--background-color);
+        color: var(--text-color);
+        padding: 0.25rem 0.75rem;
+        margin: 0.25rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        border: 1px solid var(--border-color);
+    }
+    .upload-section {
+        background: transparent;
+        margin-bottom: 0;
+        padding: 0;
+    }
+    .result-section {
+        background: var(--secondary-background-color);
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-top: 1rem;
+        border: 1px solid var(--border-color);
+    }
+    .info-box {
+        background: var(--secondary-background-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+    }
+    .footer-section {
+        text-align: center;
+        padding: 2rem 0;
+        background: var(--secondary-background-color);
+        margin-top: 3rem;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+    }
+    .confidence-high { color: #28a745; }
+    .confidence-medium { color: #ffc107; }
+    .confidence-low { color: #dc3545; }
     
-    Upload gambar dan model akan mengklasifikasikannya ke dalam salah satu dari 6 kategori:
-    🏢 Buildings • 🌲 Forest • 🏔️ Glacier • ⛰️ Mountain • 🌊 Sea • 🛣️ Street
-    """)
+    /* Streamlit auto dark mode detection */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --background-color: #262730;
+            --secondary-background-color: rgba(38, 39, 48, 0.8);
+            --text-color: #fafafa;
+            --border-color: #404040;
+        }
+    }
+    
+    @media (prefers-color-scheme: light) {
+        :root {
+            --background-color: #f8f9fa;
+            --secondary-background-color: rgba(255, 255, 255, 0.8);
+            --text-color: #495057;
+            --border-color: #dee2e6;
+        }
+    }
+    
+    /* Streamlit specific dark mode class detection */
+    .stApp[data-theme="dark"] {
+        --background-color: #262730;
+        --secondary-background-color: rgba(38, 39, 48, 0.8);
+        --text-color: #fafafa;
+        --border-color: #404040;
+    }
+    
+    /* Force text color inheritance for dark mode compatibility */
+    .info-box *, .footer-section * {
+        color: inherit !important;
+    }
+    
+    /* Default variables for compatibility */
+    :root {
+        --background-color: #f8f9fa;
+        --secondary-background-color: rgba(255, 255, 255, 0.8);
+        --text-color: #495057;
+        --border-color: #dee2e6;
+    }
+    
+    /* Hide empty space below file uploader */
+    .stFileUploader > div > div > div:last-child {
+        display: none;
+    }
+    
+    /* Adjust file uploader styling */
+    .stFileUploader > div > div {
+        border: 2px dashed var(--border-color);
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        background-color: var(--background-color);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Main header
+    st.markdown("""
+    <div class="main-header">
+        <h1 class="main-title">CLASSIFIT</h1>
+        <p class="subtitle">Intelligent Image Classification with Deep Learning</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Description section
+    st.markdown("""
+    <div style="text-align: center; margin: 2rem 0;">
+        <h3>Klasifikasi Citra Intel dengan Transfer Learning</h3>
+        <p style="font-size: 1.1rem; color: #666;">
+            Upload gambar dan AI akan mengklasifikasikannya secara real-time menggunakan MobileNetV2
+        </p>
+        <div style="margin-top: 1rem;">
+            <span class="category-tag">Buildings</span>
+            <span class="category-tag">Forest</span>
+            <span class="category-tag">Glacier</span>
+            <span class="category-tag">Mountain</span>
+            <span class="category-tag">Sea</span>
+            <span class="category-tag">Street</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load model and labels
     model = load_model()
@@ -140,86 +279,114 @@ def main():
     
     # Sidebar with info
     with st.sidebar:
-        st.header("ℹ️ Informasi Model")
-        st.write("**Arsitektur:** MobileNetV2 + Custom Layers")
-        st.write("**Akurasi:** >91%")
-        st.write("**Dataset:** Intel Image Classification")
-        st.write("**Classes:** 6 kategori")
+        st.markdown("### Model Information")
+        st.markdown("""
+        <div class="info-box">
+            <div style="color: var(--text-color);">
+                <strong>Architecture:</strong> MobileNetV2 + Custom Layers<br>
+                <strong>Accuracy:</strong> >91%<br>
+                <strong>Dataset:</strong> Intel Image Classification<br>
+                <strong>Classes:</strong> 6 categories
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.header("📊 Class Labels")
+        st.markdown("### Classification Categories")
+        
+        # Build categories list as single HTML block
+        categories_html = '<div class="info-box"><div style="color: var(--text-color);">'
         for i, label in enumerate(labels, 1):
-            emoji_map = {
-                "buildings": "🏢",
-                "forest": "🌲", 
-                "glacier": "🏔️",
-                "mountain": "⛰️",
-                "sea": "🌊",
-                "street": "🛣️"
-            }
-            emoji = emoji_map.get(label.lower(), "📸")
-            st.write(f"{i}. {emoji} {label.title()}")
+            categories_html += f"<strong>{i}.</strong> {label.title()}<br>"
+        categories_html += "</div></div>"
+        
+        st.markdown(categories_html, unsafe_allow_html=True)
     
     # Main content area
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.header("📤 Upload Gambar")
+        st.markdown("### Upload Image")
         uploaded_file = st.file_uploader(
-            "Pilih gambar untuk diklasifikasi",
+            "Drag and drop atau klik untuk memilih gambar",
             type=['png', 'jpg', 'jpeg'],
-            help="Upload gambar dalam format PNG, JPG, atau JPEG"
+            help="Supported formats: PNG, JPG, JPEG"
         )
         
         if uploaded_file is not None:
             # Display uploaded image
             image = Image.open(uploaded_file)
-            st.image(image, caption="Gambar yang diupload", use_container_width=True)
+            st.image(image, caption="Uploaded Image", use_container_width=True)
             
             # Preprocess and predict
-            with st.spinner("🔄 Memproses gambar..."):
+            with st.spinner("Processing image..."):
                 processed_image = preprocess_image(image)
                 predicted_class, confidence, top_3 = predict_image(model, processed_image, labels)
             
             if predicted_class is not None:
                 with col2:
-                    st.header("🎯 Hasil Prediksi")
+                    st.markdown("### Prediction Results")
                     
-                    # Main prediction
-                    emoji_map = {
-                        "buildings": "🏢",
-                        "forest": "🌲", 
-                        "glacier": "🏔️",
-                        "mountain": "⛰️",
-                        "sea": "🌊",
-                        "street": "🛣️"
-                    }
-                    emoji = emoji_map.get(predicted_class.lower(), "📸")
+                    # Build entire result section as single HTML block
+                    confidence_class = "confidence-high" if confidence > 0.8 else "confidence-medium" if confidence > 0.5 else "confidence-low"
                     
-                    st.success(f"**Prediksi:** {emoji} {predicted_class.title()}")
-                    st.info(f"**Confidence:** {confidence:.2%}")
+                    # Start result section
+                    result_html = f"""
+                    <div class="result-section">
+                        <div style="text-align: center; margin-bottom: 1.5rem;">
+                            <h2 style="margin: 0; color: var(--text-color);">{predicted_class.title()}</h2>
+                            <p class="{confidence_class}" style="font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0;">
+                                {confidence:.1%} Confidence
+                            </p>
+                        </div>
+                    """
                     
-                    # Progress bar for confidence
+                    st.markdown(result_html, unsafe_allow_html=True)
+                    
+                    # Confidence progress bar
                     st.progress(confidence)
                     
-                    # Top 3 predictions
-                    st.subheader("📊 Top 3 Prediksi")
+                    # Top 3 predictions - separate section
+                    st.markdown('<div style="color: var(--text-color); margin: 1rem 0;"><strong>Top 3 Predictions:</strong></div>', unsafe_allow_html=True)
+                    
+                    # Progress bars and labels for top 3
                     for i, (class_name, conf) in enumerate(top_3, 1):
-                        emoji = emoji_map.get(class_name.lower(), "📸")
-                        st.write(f"{i}. {emoji} {class_name.title()}: {conf:.2%}")
+                        conf_class = "confidence-high" if conf > 0.8 else "confidence-medium" if conf > 0.5 else "confidence-low"
+                        
+                        # Display prediction label and confidence
+                        st.markdown(f'''
+                        <div style="display: flex; justify-content: space-between; margin: 0.5rem 0; color: var(--text-color);">
+                            <span>{i}. {class_name.title()}</span>
+                            <span class="{conf_class}" style="font-weight: bold;">{conf:.1%}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                        
+                        # Progress bar
                         st.progress(conf)
                     
-                    # Additional info
-                    st.subheader("ℹ️ Detail Teknis")
-                    st.write(f"**Resolusi Input:** {image.size}")
-                    st.write(f"**Model Input:** 224×224 pixels")
-                    st.write(f"**Format:** {image.format}")
+                    # Technical details
+                    st.markdown("""
+                    <div style="color: var(--text-color); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <strong>Technical Details:</strong><br>
+                        <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                            <div>
+                                Input: {0}×{1}<br>
+                                Format: {2}
+                            </div>
+                            <div>
+                                Model: 224×224<br>
+                                Classes: 6
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    """.format(image.size[0], image.size[1], image.format), unsafe_allow_html=True)
     
     # Footer
     st.markdown("---")
     st.markdown("""
-    <div style='text-align: center'>
-        <p>🚀 Dibuat dengan <strong>Streamlit</strong> dan <strong>TensorFlow</strong></p>
-        <p>Model: Transfer Learning dengan MobileNetV2 + Custom CNN Layers</p>
+    <div class='footer-section'>
+        <p style='margin: 0; color: var(--text-color);'>Powered by <strong>Streamlit</strong> and <strong>TensorFlow</strong></p>
+        <p style='margin: 0; font-size: 0.9rem; opacity: 0.8; color: var(--text-color);'>Transfer Learning with MobileNetV2 + Custom CNN Layers</p>
     </div>
     """, unsafe_allow_html=True)
 

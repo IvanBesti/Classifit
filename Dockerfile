@@ -2,7 +2,7 @@
 # This is optional - Streamlit Cloud handles deployment automatically
 # But useful for local container testing or alternative deployment methods
 
-FROM python:3.9.18-slim
+FROM python:3.10.12-slim
 
 # Set working directory
 WORKDIR /app

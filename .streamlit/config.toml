@@ -36,4 +36,9 @@ messageFormat = "%(asctime)s %(message)s"
 [global]
 developmentMode = false
 logLevel = "info"
-unitTest = false 
+unitTest = false
+
+# Python runtime specification
+[python]
+version = "3.10"
+preferredVersion = "3.10.12" 

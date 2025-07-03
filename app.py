@@ -4,6 +4,7 @@ from PIL import Image
 import os
 import sys
 
+
 # Enhanced TensorFlow/TFLite import with better error handling
 TF_AVAILABLE = False
 INTERPRETER = None
@@ -14,6 +15,10 @@ def initialize_model():
     
     # Debug info for deployment troubleshooting
     debug_info = []
+    
+    # Add Python version info
+    python_version = sys.version_info
+    debug_info.append(f"🐍 Python version: {python_version.major}.{python_version.minor}.{python_version.micro}")
     
     try:
         model_path = "tflite/model.tflite"
@@ -30,6 +35,12 @@ def initialize_model():
             if hasattr(st, 'session_state'):
                 st.session_state.debug_info = debug_info
             return "demo_mode"
+        
+        # Check Python version compatibility first
+        if python_version >= (3, 13):
+            debug_info.append("⚠️ Python 3.13+ detected - TensorFlow may not be available")
+            debug_info.append("💡 This is expected in Streamlit Cloud deployment")
+            debug_info.append("🎭 Automatically using demo mode for compatibility")
         
         # Check TensorFlow availability first
         try:

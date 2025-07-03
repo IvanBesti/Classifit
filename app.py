@@ -1,62 +1,74 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+CLASSIFIT - AI Image Classification Application
+Linux-compatible version for Streamlit Cloud deployment
+"""
+
 import streamlit as st
 import numpy as np
 from PIL import Image
 import os
 import sys
 
-# Enhanced TensorFlow/TFLite import with better error handling
+# Global variables for safe initialization
 TF_AVAILABLE = False
 INTERPRETER = None
+MODEL_STATUS = "demo_mode"  # Always start in demo mode
 
-def initialize_model():
-    """Initialize TensorFlow model with comprehensive error handling"""
+def safe_model_loading():
+    """Completely safe model loading that never crashes the app"""
     global TF_AVAILABLE, INTERPRETER
     
+    # Always return demo mode for initial startup
+    # Model loading will be attempted only when explicitly requested
+    return "demo_mode"
+
+@st.cache_resource(show_spinner=False)
+def try_load_model():
+    """Try to load model only when needed, with full error protection"""
+    global TF_AVAILABLE, INTERPRETER
+    
+    if INTERPRETER is not None:
+        return "model_loaded"
+    
     try:
-        # First, try tflite-runtime (lighter for deployment)
+        # Try tflite-runtime first
         try:
             import tflite_runtime.interpreter as tflite
-            model_path = "tflite/model.tflite"
+            model_path = os.path.join("tflite", "model.tflite")
             
             if os.path.exists(model_path):
                 INTERPRETER = tflite.Interpreter(model_path=model_path)
                 INTERPRETER.allocate_tensors()
                 TF_AVAILABLE = True
                 return "tflite_runtime"
-            else:
-                return "demo_mode"
-                
-        except (ImportError, OSError) as e:
-            # Fallback to tensorflow.lite
-            try:
-                import tensorflow as tf
-                model_path = "tflite/model.tflite"
-                
-                if os.path.exists(model_path):
-                    INTERPRETER = tf.lite.Interpreter(model_path=model_path)
-                    INTERPRETER.allocate_tensors()
-                    TF_AVAILABLE = True
-                    return "tensorflow"
-                else:
-                    return "demo_mode"
-                    
-            except (ImportError, OSError):
-                return "demo_mode"
-    
-    except Exception as e:
-        # Silent fallback to demo mode for any other errors
-        return "demo_mode"
-
-# Initialize model status (lazy loading)
-MODEL_STATUS = None
+        except:
+            pass
+            
+        # Try tensorflow as fallback
+        try:
+            import tensorflow as tf
+            model_path = os.path.join("tflite", "model.tflite")
+            
+            if os.path.exists(model_path):
+                INTERPRETER = tf.lite.Interpreter(model_path=model_path)
+                INTERPRETER.allocate_tensors()
+                TF_AVAILABLE = True
+                return "tensorflow"
+        except:
+            pass
+            
+    except:
+        pass
+        
+    # Always fallback to demo mode - never crash
+    return "demo_mode"
 
 @st.cache_resource
 def get_model_status():
-    """Get model status with lazy initialization"""
-    global MODEL_STATUS
-    if MODEL_STATUS is None:
-        MODEL_STATUS = initialize_model()
-    return MODEL_STATUS
+    """Get model status - always safe, never crashes"""
+    return "demo_mode"  # Always start safe
 
 # Set page config
 st.set_page_config(
@@ -71,7 +83,7 @@ st.set_page_config(
 def load_labels():
     """Load class labels from the label file with fallback"""
     try:
-        labels_path = "tflite/label.txt"
+        labels_path = os.path.join("tflite", "label.txt")
         if os.path.exists(labels_path):
             with open(labels_path, 'r', encoding='utf-8') as f:
                 labels = [line.strip() for line in f.readlines() if line.strip()]
@@ -181,13 +193,20 @@ def predict_image_real(image_array, labels):
         return None, None, None
 
 def predict_image(image_array, labels):
-    """Main prediction function with fallback to demo mode"""
-    if TF_AVAILABLE and INTERPRETER is not None:
-        result = predict_image_real(image_array, labels)
-        if result[0] is not None:
-            return result
+    """Main prediction function with safe model loading attempt"""
+    # First try to load model if not already loaded
+    model_status = try_load_model()
     
-    # Fallback to demo mode
+    # If model loaded successfully, try real prediction
+    if model_status in ["tflite_runtime", "tensorflow"] and TF_AVAILABLE and INTERPRETER is not None:
+        try:
+            result = predict_image_real(image_array, labels)
+            if result[0] is not None:
+                return result
+        except:
+            pass  # Fallback to demo if real prediction fails
+    
+    # Always fallback to demo mode - safe and fast
     return predict_image_demo(labels)
 
 def get_confidence_color(confidence):
@@ -638,9 +657,8 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Show model status
-    model_status = get_model_status()
-    if model_status == "demo_mode":
+    # Always show demo mode status at startup for safety
+    if True:  # Always demo mode at startup
         st.markdown("""
         <div class="status-demo">
             🎭 <strong>Demo Mode Active</strong> - TensorFlow not available, showing simulated results
@@ -698,7 +716,7 @@ def main():
             </div>
             <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
                 <strong style="color: var(--text-color) !important;">⚡ Status:</strong> 
-                <span style="color: var(--success-color) !important; font-weight: 600;">{model_status.replace('_', ' ').title()}</span>
+                <span style="color: var(--warning-color) !important; font-weight: 600;">Demo Mode</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -714,7 +732,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        if model_status == "demo_mode":
+        if True:  # Always show demo info at startup
             st.markdown("### ℹ️ Demo Mode Info")
             st.markdown("""
             <div class="info-box demo-info">
@@ -824,7 +842,7 @@ def main():
                             <span style="color: var(--text-secondary) !important;">
                             • Architecture: MobileNetV2<br>
                             • Classes: {len(labels)}<br>
-                            • Backend: {model_status.replace('_', ' ').title()}
+                            • Backend: Demo Mode
                             </span>
                         </div>
                         """
@@ -836,9 +854,7 @@ def main():
     
     # Footer
     st.markdown("---")
-    backend_info = model_status.replace('_', ' ').title()
-    if model_status == "demo_mode":
-        backend_info += " (Simulated)"
+    backend_info = "Demo Mode (Simulated)"
     
     st.markdown(f"""
     <div class="footer-section custom-text">

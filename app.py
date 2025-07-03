@@ -1,12 +1,21 @@
 import streamlit as st
-try:
-    import tflite_runtime.interpreter as tflite
-except ImportError:
-    import tensorflow as tf
-    tflite = tf.lite
 import numpy as np
 from PIL import Image
 import os
+
+# Try to import TensorFlow/TFLite, but make it optional
+TF_AVAILABLE = False
+try:
+    import tflite_runtime.interpreter as tflite
+    TF_AVAILABLE = True
+except ImportError:
+    try:
+        import tensorflow as tf
+        tflite = tf.lite
+        TF_AVAILABLE = True
+    except ImportError:
+        st.warning("⚠️ TensorFlow not available. Running in demo mode.")
+        TF_AVAILABLE = False
 
 # Set page config
 st.set_page_config(
@@ -31,7 +40,10 @@ def load_labels():
 # Load the trained model
 @st.cache_resource
 def load_model():
-    """Load the TensorFlow Lite model"""
+    """Load the TensorFlow Lite model or return demo mode"""
+    if not TF_AVAILABLE:
+        return "demo_mode"
+    
     try:
         model_path = "tflite/model.tflite"
         if os.path.exists(model_path):
@@ -41,10 +53,10 @@ def load_model():
             return interpreter
         else:
             st.error("Model TFLite tidak ditemukan! Pastikan file 'tflite/model.tflite' ada.")
-            return None
+            return "demo_mode"
     except Exception as e:
         st.error(f"Error loading TFLite model: {str(e)}")
-        return None
+        return "demo_mode"
 
 def preprocess_image(image):
     """Preprocess the uploaded image for prediction"""
@@ -66,21 +78,44 @@ def preprocess_image(image):
     
     return image_array
 
-def predict_image(interpreter, image_array, labels):
-    """Make prediction on the preprocessed image using TFLite interpreter"""
+def predict_image(model, image_array, labels):
+    """Make prediction on the preprocessed image using TFLite interpreter or demo mode"""
+    if model == "demo_mode":
+        # Demo mode - return fake predictions
+        import random
+        random.seed(42)  # Consistent demo results
+        
+        # Generate fake but realistic-looking predictions
+        fake_probs = [random.uniform(0.1, 0.9) for _ in labels]
+        total = sum(fake_probs)
+        fake_probs = [p/total for p in fake_probs]  # Normalize to sum to 1
+        
+        predicted_class_idx = np.argmax(fake_probs)
+        confidence = fake_probs[predicted_class_idx]
+        predicted_class = labels[predicted_class_idx]
+        
+        # Get top 3 predictions
+        top_3_idx = np.argsort(fake_probs)[-3:][::-1]
+        top_3_predictions = [
+            (labels[idx], fake_probs[idx]) 
+            for idx in top_3_idx
+        ]
+        
+        return predicted_class, confidence, top_3_predictions
+    
     try:
         # Get input and output details
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
         
         # Set the tensor to point to the input data to be inferred
-        interpreter.set_tensor(input_details[0]['index'], image_array)
+        model.set_tensor(input_details[0]['index'], image_array)
         
         # Run inference
-        interpreter.invoke()
+        model.invoke()
         
         # Get the result
-        predictions = interpreter.get_tensor(output_details[0]['index'])
+        predictions = model.get_tensor(output_details[0]['index'])
         
         # Handle predictions
         if len(predictions.shape) > 1:
@@ -255,8 +290,9 @@ def main():
     model = load_model()
     labels = load_labels()
     
-    if model is None:
-        st.stop()
+    # Show demo mode message if TensorFlow not available
+    if model == "demo_mode":
+        st.info("🚀 **Demo Mode**: TensorFlow tidak tersedia, tapi kamu masih bisa lihat UI dan test dengan prediksi demo!")
     
     # Sidebar with info
     with st.sidebar:
@@ -364,9 +400,10 @@ def main():
     
     # Footer
     st.markdown("---")
-    st.markdown("""
+    tf_status = "TensorFlow Lite" if model != "demo_mode" else "Demo Mode"
+    st.markdown(f"""
     <div class='footer-section'>
-        <p style='margin: 0; color: var(--text-color);'>Powered by <strong>Streamlit</strong> and <strong>TensorFlow</strong></p>
+        <p style='margin: 0; color: var(--text-color);'>Powered by <strong>Streamlit</strong> and <strong>{tf_status}</strong></p>
         <p style='margin: 0; font-size: 0.9rem; opacity: 0.8; color: var(--text-color);'>Transfer Learning with MobileNetV2 + Custom CNN Layers</p>
     </div>
     """, unsafe_allow_html=True)

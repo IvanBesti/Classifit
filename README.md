@@ -73,9 +73,11 @@ Model mampu melakukan generalisasi dengan baik pada data yang belum pernah dilih
 3. Ikuti urutan sel untuk melatih, menguji, dan melakukan prediksi pada gambar.
 
 ### 🌐 Web Application (Streamlit)
-1. Instal dependensi (jika belum):
+
+#### 🏠 Local Development
+1. Instal dependensi lengkap:
    \`\`\`bash
-   pip install -r requirements.txt
+   pip install -r requirements_full.txt
    \`\`\`
 
 2. Jalankan aplikasi web:
@@ -89,14 +91,16 @@ Model mampu melakukan generalisasi dengan baik pada data yang belum pernah dilih
 
 3. Buka browser di `http://localhost:8501`
 
-4. Upload gambar dan lihat hasil klasifikasi secara real-time!
+#### ☁️ Live Demo
+🚀 **Akses aplikasi web secara langsung:** [classifit.streamlit.app](https://classifit.streamlit.app)
 
-**Fitur Web App:**
+#### 📋 Features
 - 📤 Upload gambar (PNG, JPG, JPEG)
 - 🎯 Prediksi real-time dengan confidence score
-- 📊 Top 3 prediksi dengan visualisasi
-- 🎨 Interface yang user-friendly
-- 📱 Responsive design
+- 📊 Top 3 prediksi dengan visualisasi progress bar
+- 🎨 Interface modern dengan dark/light mode support
+- 📱 Responsive design untuk desktop dan mobile
+- 🌓 Auto-adaptive styling untuk berbagai theme
 
 ---
 

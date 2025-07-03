@@ -38,9 +38,11 @@ def initialize_model():
         
         # Check Python version compatibility first
         if python_version >= (3, 13):
-            debug_info.append("⚠️ Python 3.13+ detected - TensorFlow may not be available")
-            debug_info.append("💡 This is expected in Streamlit Cloud deployment")
-            debug_info.append("🎭 Automatically using demo mode for compatibility")
+            debug_info.append("⚠️ Python 3.13+ detected - TensorFlow not supported")
+            debug_info.append("💡 Streamlit Cloud ignores runtime.txt and forces Python 3.13")
+            debug_info.append("🔧 Tried: runtime.txt, .python-version, pyproject.toml, config.toml")
+            debug_info.append("🎭 Using demo mode - full UI functionality maintained")
+            debug_info.append("✨ For real AI: run locally with Python 3.10-3.12")
         
         # Check TensorFlow availability first
         try:

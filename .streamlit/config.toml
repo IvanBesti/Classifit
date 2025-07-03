@@ -10,7 +10,6 @@ fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
-serverAddress = "0.0.0.0"
 
 [theme]
 base = "light"
@@ -19,20 +18,6 @@ base = "light"
 developmentMode = false
 showWarningOnDirectExecution = false
 
-[runner]
-magicEnabled = false
-installTracer = false
-fixMatplotlib = false
-
 [logger]
 level = "error"
-messageFormat = "%(asctime)s %(message)s"
-
-[client]
-caching = true
-displayEnabled = true
-showErrorDetails = false
-
-[deprecation]
-showfileUploaderEncoding = false
-showImageFormat = false 
+messageFormat = "%(asctime)s %(message)s" 

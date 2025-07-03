@@ -7,8 +7,8 @@ plotly>=5.0.0,<6.0.0
 scikit-learn>=1.3.0,<2.0.0
 
 # ML dependencies for AI inference
-tensorflow-cpu>=2.15.0,<2.16.0
-# Note: Using tensorflow-cpu for lighter deployment on Streamlit Cloud
+tensorflow>=2.13.0,<=2.15.1
+# Note: Using broader version range for Streamlit Cloud compatibility
 
 # Production optimization
 altair>=5.0.0,<6.0.0

@@ -59,6 +59,7 @@ Model mampu melakukan generalisasi dengan baik pada data yang belum pernah dilih
 
 ## 🚀 Cara Menjalankan Proyek
 
+### 📊 Training & Evaluasi (Jupyter Notebook)
 1. Instal semua dependensi:
    \`\`\`bash
    pip install -r requirements.txt
@@ -70,6 +71,32 @@ Model mampu melakukan generalisasi dengan baik pada data yang belum pernah dilih
    \`\`\`
 
 3. Ikuti urutan sel untuk melatih, menguji, dan melakukan prediksi pada gambar.
+
+### 🌐 Web Application (Streamlit)
+1. Instal dependensi (jika belum):
+   \`\`\`bash
+   pip install -r requirements.txt
+   \`\`\`
+
+2. Jalankan aplikasi web:
+   \`\`\`bash
+   # Opsi 1: Menggunakan script otomatis
+   python3 run_app.py
+   
+   # Opsi 2: Langsung dengan streamlit
+   streamlit run app.py
+   \`\`\`
+
+3. Buka browser di `http://localhost:8501`
+
+4. Upload gambar dan lihat hasil klasifikasi secara real-time!
+
+**Fitur Web App:**
+- 📤 Upload gambar (PNG, JPG, JPEG)
+- 🎯 Prediksi real-time dengan confidence score
+- 📊 Top 3 prediksi dengan visualisasi
+- 🎨 Interface yang user-friendly
+- 📱 Responsive design
 
 ---
 

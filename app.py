@@ -1,5 +1,5 @@
 import streamlit as st
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 import numpy as np
 from PIL import Image
 import os
@@ -27,37 +27,20 @@ def load_labels():
 # Load the trained model
 @st.cache_resource
 def load_model():
-    """Load the trained TensorFlow model using TFSMLayer for Keras 3 compatibility"""
+    """Load the TensorFlow Lite model"""
     try:
-        model_path = "saved_model"
+        model_path = "tflite/model.tflite"
         if os.path.exists(model_path):
-            # For Keras 3, use TFSMLayer to load SavedModel
-            tfsm_layer = tf.keras.layers.TFSMLayer(model_path, call_endpoint='serving_default')
-            
-            # Create a simple wrapper model
-            inputs = tf.keras.Input(shape=(224, 224, 3))
-            outputs = tfsm_layer(inputs)
-            
-            # Handle dictionary output from TFSMLayer
-            if isinstance(outputs, dict):
-                # Get the actual prediction output (usually the first/main output)
-                output_key = list(outputs.keys())[0]
-                outputs = outputs[output_key]
-            
-            model = tf.keras.Model(inputs=inputs, outputs=outputs)
-            return model
+            # Load TFLite model and allocate tensors
+            interpreter = tflite.Interpreter(model_path=model_path)
+            interpreter.allocate_tensors()
+            return interpreter
         else:
-            st.error("Model tidak ditemukan! Pastikan folder 'saved_model' ada.")
+            st.error("Model TFLite tidak ditemukan! Pastikan file 'tflite/model.tflite' ada.")
             return None
     except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        # Fallback: try loading with TensorFlow's SavedModel loader
-        try:
-            model = tf.saved_model.load(model_path)
-            return model
-        except Exception as e2:
-            st.error(f"Fallback loading juga gagal: {str(e2)}")
-            return None
+        st.error(f"Error loading TFLite model: {str(e)}")
+        return None
 
 def preprocess_image(image):
     """Preprocess the uploaded image for prediction"""
@@ -79,27 +62,21 @@ def preprocess_image(image):
     
     return image_array
 
-def predict_image(model, image_array, labels):
-    """Make prediction on the preprocessed image"""
+def predict_image(interpreter, image_array, labels):
+    """Make prediction on the preprocessed image using TFLite interpreter"""
     try:
-        # Check if model is a Keras model or TF SavedModel
-        if hasattr(model, 'predict'):
-            # Keras model
-            predictions = model.predict(image_array)
-        else:
-            # TF SavedModel - use inference function
-            infer = model.signatures['serving_default']
-            input_tensor = tf.convert_to_tensor(image_array, dtype=tf.float32)
-            
-            # Get input name dynamically
-            input_keys = list(infer.structured_input_signature[1].keys())
-            input_name = input_keys[0] if input_keys else 'input_1'
-            
-            predictions = infer(**{input_name: input_tensor})
-            
-            # Extract predictions from output dict
-            output_keys = list(predictions.keys())
-            predictions = predictions[output_keys[0]].numpy()
+        # Get input and output details
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        
+        # Set the tensor to point to the input data to be inferred
+        interpreter.set_tensor(input_details[0]['index'], image_array)
+        
+        # Run inference
+        interpreter.invoke()
+        
+        # Get the result
+        predictions = interpreter.get_tensor(output_details[0]['index'])
         
         # Handle predictions
         if len(predictions.shape) > 1:

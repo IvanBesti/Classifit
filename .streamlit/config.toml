@@ -1,9 +1,38 @@
 [server]
 headless = true
 port = 8501
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 200
+runOnSave = false
+allowRunOnSave = false
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
 
 [theme]
-base = "light" 
+base = "light"
+
+[global]
+developmentMode = false
+showWarningOnDirectExecution = false
+
+[runner]
+magicEnabled = false
+installTracer = false
+fixMatplotlib = false
+
+[logger]
+level = "error"
+messageFormat = "%(asctime)s %(message)s"
+
+[client]
+caching = true
+displayEnabled = true
+showErrorDetails = false
+
+[deprecation]
+showfileUploaderEncoding = false
+showImageFormat = false 

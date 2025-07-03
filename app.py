@@ -12,44 +12,51 @@ def initialize_model():
     """Initialize TensorFlow model with comprehensive error handling"""
     global TF_AVAILABLE, INTERPRETER
     
-    # First, try tflite-runtime (lighter for deployment)
     try:
-        import tflite_runtime.interpreter as tflite
-        model_path = "tflite/model.tflite"
-        
-        if os.path.exists(model_path):
-            INTERPRETER = tflite.Interpreter(model_path=model_path)
-            INTERPRETER.allocate_tensors()
-            TF_AVAILABLE = True
-            return "tflite_runtime"
-        else:
-            st.warning(f"Model file not found at {model_path}")
-            return "demo_mode"
-            
-    except ImportError:
-        # Fallback to tensorflow.lite
+        # First, try tflite-runtime (lighter for deployment)
         try:
-            import tensorflow as tf
+            import tflite_runtime.interpreter as tflite
             model_path = "tflite/model.tflite"
             
             if os.path.exists(model_path):
-                INTERPRETER = tf.lite.Interpreter(model_path=model_path)
+                INTERPRETER = tflite.Interpreter(model_path=model_path)
                 INTERPRETER.allocate_tensors()
                 TF_AVAILABLE = True
-                return "tensorflow"
+                return "tflite_runtime"
             else:
-                st.warning(f"Model file not found at {model_path}")
                 return "demo_mode"
                 
-        except ImportError:
-            return "demo_mode"
-            
+        except (ImportError, OSError) as e:
+            # Fallback to tensorflow.lite
+            try:
+                import tensorflow as tf
+                model_path = "tflite/model.tflite"
+                
+                if os.path.exists(model_path):
+                    INTERPRETER = tf.lite.Interpreter(model_path=model_path)
+                    INTERPRETER.allocate_tensors()
+                    TF_AVAILABLE = True
+                    return "tensorflow"
+                else:
+                    return "demo_mode"
+                    
+            except (ImportError, OSError):
+                return "demo_mode"
+    
     except Exception as e:
-        st.warning(f"Model loading error: {str(e)}")
+        # Silent fallback to demo mode for any other errors
         return "demo_mode"
 
-# Initialize model at startup
-MODEL_STATUS = initialize_model()
+# Initialize model status (lazy loading)
+MODEL_STATUS = None
+
+@st.cache_resource
+def get_model_status():
+    """Get model status with lazy initialization"""
+    global MODEL_STATUS
+    if MODEL_STATUS is None:
+        MODEL_STATUS = initialize_model()
+    return MODEL_STATUS
 
 # Set page config
 st.set_page_config(
@@ -632,7 +639,8 @@ def main():
     """, unsafe_allow_html=True)
     
     # Show model status
-    if MODEL_STATUS == "demo_mode":
+    model_status = get_model_status()
+    if model_status == "demo_mode":
         st.markdown("""
         <div class="status-demo">
             🎭 <strong>Demo Mode Active</strong> - TensorFlow not available, showing simulated results
@@ -690,7 +698,7 @@ def main():
             </div>
             <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
                 <strong style="color: var(--text-color) !important;">⚡ Status:</strong> 
-                <span style="color: var(--success-color) !important; font-weight: 600;">{MODEL_STATUS.replace('_', ' ').title()}</span>
+                <span style="color: var(--success-color) !important; font-weight: 600;">{model_status.replace('_', ' ').title()}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -706,7 +714,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        if MODEL_STATUS == "demo_mode":
+        if model_status == "demo_mode":
             st.markdown("### ℹ️ Demo Mode Info")
             st.markdown("""
             <div class="info-box demo-info">
@@ -816,7 +824,7 @@ def main():
                             <span style="color: var(--text-secondary) !important;">
                             • Architecture: MobileNetV2<br>
                             • Classes: {len(labels)}<br>
-                            • Backend: {MODEL_STATUS.replace('_', ' ').title()}
+                            • Backend: {model_status.replace('_', ' ').title()}
                             </span>
                         </div>
                         """
@@ -828,8 +836,8 @@ def main():
     
     # Footer
     st.markdown("---")
-    backend_info = MODEL_STATUS.replace('_', ' ').title()
-    if MODEL_STATUS == "demo_mode":
+    backend_info = model_status.replace('_', ' ').title()
+    if model_status == "demo_mode":
         backend_info += " (Simulated)"
     
     st.markdown(f"""

@@ -1,5 +1,9 @@
 import streamlit as st
-import tflite_runtime.interpreter as tflite
+try:
+    import tflite_runtime.interpreter as tflite
+except ImportError:
+    import tensorflow as tf
+    tflite = tf.lite
 import numpy as np
 from PIL import Image
 import os

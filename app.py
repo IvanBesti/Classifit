@@ -9,47 +9,75 @@ TF_AVAILABLE = False
 INTERPRETER = None
 
 def initialize_model():
-    """Initialize TensorFlow model with smart fallback"""
+    """Initialize TensorFlow model with smart fallback and debug logging"""
     global TF_AVAILABLE, INTERPRETER
     
-    # Try to load model (both local and deployment)
+    debug_info = []
+    model_path = "tflite/model.tflite"
+    
+    # Debug: Check environment
+    is_deployment = os.getenv('STREAMLIT_SHARING_MODE') or os.getenv('STREAMLIT_CLOUD')
+    debug_info.append(f"Deployment environment: {is_deployment}")
+    debug_info.append(f"Working directory: {os.getcwd()}")
+    debug_info.append(f"Model file exists: {os.path.exists(model_path)}")
+    
+    if os.path.exists(model_path):
+        debug_info.append(f"Model file size: {os.path.getsize(model_path)} bytes")
+    
+    # Check if model file exists
+    if not os.path.exists(model_path):
+        debug_info.append("❌ Model file not found - using demo mode")
+        if os.getenv('STREAMLIT_ENV') == 'development':
+            st.sidebar.write("🐛 Debug:", debug_info)
+        return "demo_mode"
+    
+    # Try to load model
     try:
-        model_path = "tflite/model.tflite"
-        
-        # Check if model file exists
-        if not os.path.exists(model_path):
-            return "demo_mode"
-        
         # First, try tflite-runtime (lighter for deployment)
         try:
             import tflite_runtime.interpreter as tflite
+            debug_info.append("✅ tflite-runtime imported successfully")
             INTERPRETER = tflite.Interpreter(model_path=model_path)
             INTERPRETER.allocate_tensors()
             TF_AVAILABLE = True
+            debug_info.append("✅ Model loaded with tflite-runtime")
+            if os.getenv('STREAMLIT_ENV') == 'development':
+                st.sidebar.write("🐛 Debug:", debug_info)
             return "tflite_runtime"
-        except ImportError:
-            pass
-        except Exception:
-            # If tflite-runtime fails to load model, try tensorflow
-            pass
+        except ImportError as e:
+            debug_info.append(f"⚠️ tflite-runtime not available: {e}")
+        except Exception as e:
+            debug_info.append(f"❌ tflite-runtime load error: {e}")
         
         # Fallback to tensorflow.lite
         try:
             import tensorflow as tf
+            debug_info.append(f"✅ TensorFlow {tf.__version__} imported successfully")
             INTERPRETER = tf.lite.Interpreter(model_path=model_path)
             INTERPRETER.allocate_tensors()
             TF_AVAILABLE = True
+            debug_info.append("✅ Model loaded with tensorflow.lite")
+            if os.getenv('STREAMLIT_ENV') == 'development':
+                st.sidebar.write("🐛 Debug:", debug_info)
             return "tensorflow"
-        except ImportError:
-            pass
-        except Exception:
-            # If tensorflow also fails, go to demo mode
-            pass
+        except ImportError as e:
+            debug_info.append(f"❌ TensorFlow not available: {e}")
+        except Exception as e:
+            debug_info.append(f"❌ TensorFlow load error: {e}")
             
-    except Exception:
-        pass
+    except Exception as e:
+        debug_info.append(f"❌ Unexpected error: {e}")
     
-    # Default to demo mode if all attempts fail
+    # Default to demo mode with debug info
+    debug_info.append("🎭 Falling back to demo mode")
+    
+    # Show debug info in development or if there are issues
+    if os.getenv('STREAMLIT_ENV') == 'development' or len(debug_info) > 5:
+        try:
+            st.sidebar.write("🐛 Model Loading Debug:", debug_info)
+        except:
+            pass  # In case st is not available yet
+    
     return "demo_mode"
 
 # Initialize model status (lazy loading to avoid blocking)

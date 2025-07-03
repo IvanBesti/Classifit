@@ -1,5 +1,8 @@
 # 🧠 Klasifikasi Citra Intel dengan CNN + Transfer Learning
 
+Web
+https://classifit.streamlit.app/
+
 Proyek ini melakukan klasifikasi gambar dari **dataset Intel Image Classification** menggunakan **Transfer Learning (MobileNetV2)** yang dikombinasikan dengan layer tambahan **Conv2D dan Pooling**. Model dibangun dengan TensorFlow/Keras dan diekspor dalam berbagai format untuk keperluan deployment.
 
 Model dikembangkan untuk mengklasifikasikan gambar menjadi 6 kategori:

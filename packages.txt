@@ -1,9 +1,21 @@
-libgl1-mesa-glx
-libglib2.0-0
-libsm6
-libxext6
-libxrender-dev
-libgomp1
-libgcc-s1
-ffmpeg
-libpython3-dev 
+# System packages for Linux deployment
+# These are apt packages that will be installed on the deployment server
+
+# Image processing dependencies
+libjpeg-dev
+libpng-dev
+libtiff-dev
+libwebp-dev
+libopenjp2-7-dev
+
+# Font support
+fonts-liberation
+fontconfig
+
+# Build tools (if needed)
+build-essential
+pkg-config
+
+# Optional: for better matplotlib support
+libfreetype6-dev
+libfontconfig1-dev 

@@ -52,7 +52,7 @@ def check_ml_dependencies():
         pass
     
     # Check model file
-    ml_status['model_file'] = os.path.exists(os.path.join("tflite", "model.tflite"))
+    ml_status['model_file'] = os.path.exists("tflite/model.tflite")
     
     return ml_status
 

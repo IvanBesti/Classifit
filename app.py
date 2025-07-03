@@ -1,97 +1,98 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-CLASSIFIT - AI Image Classification Application
-Linux-compatible version for Streamlit Cloud deployment
-"""
-
 import streamlit as st
 import numpy as np
 from PIL import Image
 import os
 import sys
 
-# Global variables for safe initialization
+# Enhanced TensorFlow/TFLite import with better error handling
 TF_AVAILABLE = False
 INTERPRETER = None
-MODEL_STATUS = "demo_mode"  # Always start in demo mode
 
-def safe_model_loading():
-    """Completely safe model loading that never crashes the app"""
+def initialize_model():
+    """Initialize TensorFlow model with comprehensive error handling"""
     global TF_AVAILABLE, INTERPRETER
     
-    # Always return demo mode for initial startup
-    # Model loading will be attempted only when explicitly requested
-    return "demo_mode"
-
-@st.cache_resource(show_spinner=False)
-def try_load_model():
-    """Try to load model only when needed, with full error protection"""
-    global TF_AVAILABLE, INTERPRETER
-    
-    if INTERPRETER is not None:
-        return "model_loaded"
-    
+    # First, try tflite-runtime (lighter for deployment)
     try:
-        # Try tflite-runtime first
-        try:
-            import tflite_runtime.interpreter as tflite
-            model_path = os.path.join("tflite", "model.tflite")
+        import tflite_runtime.interpreter as tflite
+        model_path = "tflite/model.tflite"
+        
+        if os.path.exists(model_path):
+            INTERPRETER = tflite.Interpreter(model_path=model_path)
+            INTERPRETER.allocate_tensors()
+            TF_AVAILABLE = True
+            return "tflite_runtime"
+        else:
+            st.warning(f"Model file not found at {model_path}")
+            return "demo_mode"
             
-            if os.path.exists(model_path):
-                INTERPRETER = tflite.Interpreter(model_path=model_path)
-                INTERPRETER.allocate_tensors()
-                TF_AVAILABLE = True
-                return "tflite_runtime"
-        except:
-            pass
-            
-        # Try tensorflow as fallback
+    except ImportError:
+        # Fallback to tensorflow.lite
         try:
             import tensorflow as tf
-            model_path = os.path.join("tflite", "model.tflite")
+            model_path = "tflite/model.tflite"
             
             if os.path.exists(model_path):
                 INTERPRETER = tf.lite.Interpreter(model_path=model_path)
                 INTERPRETER.allocate_tensors()
                 TF_AVAILABLE = True
                 return "tensorflow"
-        except:
-            pass
+            else:
+                st.warning(f"Model file not found at {model_path}")
+                return "demo_mode"
+                
+        except ImportError:
+            return "demo_mode"
             
-    except:
-        pass
-        
-    # Always fallback to demo mode - never crash
-    return "demo_mode"
+    except Exception as e:
+        st.warning(f"Model loading error: {str(e)}")
+        return "demo_mode"
 
-@st.cache_resource
-def get_model_status():
-    """Get model status - always safe, never crashes"""
-    return "demo_mode"  # Always start safe
+# Initialize model at startup
+MODEL_STATUS = initialize_model()
 
-# Set page config
+# Set page config with production optimizations
 st.set_page_config(
     page_title="CLASSIFIT - AI Image Classification",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/yourusername/classifit',
+        'Report a bug': 'https://github.com/yourusername/classifit/issues',
+        'About': """
+        # CLASSIFIT v2.0.0
+        
+        Advanced AI-powered image classification using deep learning.
+        Built with Streamlit, TensorFlow, and MobileNetV2.
+        
+        **Features:**
+        - Real-time image classification
+        - 6 category support (Buildings, Forest, Glacier, Mountain, Sea, Street)
+        - Progressive web app capabilities
+        - Dark/Light mode support
+        - Mobile responsive design
+        """
+    }
 )
 
-# Load class labels
-@st.cache_data
+# Load class labels with enhanced caching
+@st.cache_data(ttl=3600, show_spinner=False)  # Cache for 1 hour
 def load_labels():
     """Load class labels from the label file with fallback"""
     try:
-        labels_path = os.path.join("tflite", "label.txt")
+        labels_path = "tflite/label.txt"
         if os.path.exists(labels_path):
             with open(labels_path, 'r', encoding='utf-8') as f:
                 labels = [line.strip() for line in f.readlines() if line.strip()]
-            return labels
+            if labels:  # Only return if we have valid labels
+                return labels
     except Exception as e:
-        st.warning(f"Could not load labels: {str(e)}")
+        # Log error in production but don't show to user unless in debug mode
+        if os.getenv('STREAMLIT_ENV') == 'development':
+            st.warning(f"Could not load labels: {str(e)}")
     
-    # Fallback labels
+    # Fallback labels (Intel Image Classification dataset)
     return ["buildings", "forest", "glacier", "mountain", "sea", "street"]
 
 def preprocess_image(image):
@@ -193,20 +194,13 @@ def predict_image_real(image_array, labels):
         return None, None, None
 
 def predict_image(image_array, labels):
-    """Main prediction function with safe model loading attempt"""
-    # First try to load model if not already loaded
-    model_status = try_load_model()
+    """Main prediction function with fallback to demo mode"""
+    if TF_AVAILABLE and INTERPRETER is not None:
+        result = predict_image_real(image_array, labels)
+        if result[0] is not None:
+            return result
     
-    # If model loaded successfully, try real prediction
-    if model_status in ["tflite_runtime", "tensorflow"] and TF_AVAILABLE and INTERPRETER is not None:
-        try:
-            result = predict_image_real(image_array, labels)
-            if result[0] is not None:
-                return result
-        except:
-            pass  # Fallback to demo if real prediction fails
-    
-    # Always fallback to demo mode - safe and fast
+    # Fallback to demo mode
     return predict_image_demo(labels)
 
 def get_confidence_color(confidence):
@@ -218,8 +212,36 @@ def get_confidence_color(confidence):
     else:
         return "confidence-low"
 
+@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
+def get_app_info():
+    """Get application information for production monitoring"""
+    return {
+        "version": "2.0.0",
+        "ml_backend": MODEL_STATUS,
+        "python_version": sys.version.split()[0],
+        "platform": sys.platform,
+        "streamlit_version": st.__version__
+    }
+
+def add_footer_analytics():
+    """Add analytics and footer information"""
+    app_info = get_app_info()
+    
+    # Add some basic analytics (non-intrusive)
+    st.markdown("""
+    <script>
+    // Basic page view tracking (non-personal)
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'page_view', {
+            'page_title': 'CLASSIFIT - AI Image Classification',
+            'page_location': window.location.href
+        });
+    }
+    </script>
+    """, unsafe_allow_html=True)
+
 def main():
-    """Main application function"""
+    """Main application function with production optimizations"""
     
     # Enhanced CSS with perfect dark/light mode text support
     st.markdown("""
@@ -234,11 +256,11 @@ def main():
         
         /* Light theme colors */
         --light-bg: #ffffff;
-        --light-secondary-bg: rgba(248, 249, 250, 0.95);
-        --light-text: #212529;
-        --light-text-secondary: #6c757d;
-        --light-border: #dee2e6;
-        --light-shadow: rgba(0, 0, 0, 0.1);
+        --light-secondary-bg: rgba(248, 249, 250, 0.98);
+        --light-text: #1a1a1a;
+        --light-text-secondary: #495057;
+        --light-border: #d1d5db;
+        --light-shadow: rgba(0, 0, 0, 0.15);
         
         /* Dark theme colors */
         --dark-bg: #0e1117;
@@ -386,8 +408,19 @@ def main():
     }
     
     .info-box strong {
-        color: var(--text-color);
-        font-weight: 600;
+        color: var(--text-color) !important;
+        font-weight: 700 !important;
+    }
+    
+    .info-box br + strong {
+        margin-top: 0.5rem;
+        display: inline-block;
+    }
+    
+    /* Better text styling in info boxes */
+    .info-box, .info-box * {
+        color: var(--text-color) !important;
+        line-height: 1.6 !important;
     }
     
     /* Result section with improved text visibility */
@@ -486,19 +519,10 @@ def main():
     .stSidebar .info-box {
         background: var(--secondary-bg);
         border: 1px solid var(--border-color);
-        color: var(--text-color) !important;
+        box-shadow: 0 2px 8px var(--shadow-color);
     }
     
-    .stSidebar .info-box * {
-        color: var(--text-color) !important;
-    }
-    
-    .stSidebar .info-box strong {
-        color: var(--text-color) !important;
-        font-weight: 600;
-    }
-    
-    /* Sidebar text enhancement */
+    /* Enhanced sidebar styling for better readability */
     .stSidebar {
         background-color: var(--bg-color);
     }
@@ -509,77 +533,8 @@ def main():
     
     .stSidebar h3 {
         color: var(--text-color) !important;
-        font-weight: 600;
-    }
-    
-    /* Enhanced sidebar categories styling */
-    .sidebar-categories {
-        background: var(--secondary-bg) !important;
-        border: 1px solid var(--border-color) !important;
-        color: var(--text-color) !important;
-    }
-    
-    .sidebar-categories * {
-        color: var(--text-color) !important;
-    }
-    
-    .sidebar-categories div {
-        border-bottom: 1px solid var(--border-color);
-        transition: all 0.2s ease;
-    }
-    
-    .sidebar-categories div:last-child {
-        border-bottom: none;
-    }
-    
-    .sidebar-categories div:hover {
-        background: var(--primary-color);
-        color: #ffffff !important;
-        border-radius: 6px;
-        padding-left: 0.6rem !important;
-        transform: translateX(2px);
-    }
-    
-    .sidebar-categories div:hover * {
-        color: #ffffff !important;
-    }
-    
-    /* Enhanced sidebar info styling */
-    .sidebar-info {
-        background: var(--secondary-bg) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-    
-    .sidebar-info * {
-        color: var(--text-color) !important;
-    }
-    
-    .sidebar-info div {
-        border-bottom: 1px solid var(--border-color);
-        padding: 0.4rem 0;
-        transition: all 0.2s ease;
-    }
-    
-    .sidebar-info div:last-child {
-        border-bottom: none;
-    }
-    
-    .sidebar-info div:hover {
-        background: rgba(102, 126, 234, 0.1);
-        border-radius: 6px;
-        padding-left: 0.6rem !important;
-        transform: translateX(2px);
-    }
-    
-    /* Demo info styling */
-    .demo-info {
-        background: var(--secondary-bg) !important;
-        border: 2px solid var(--warning-color) !important;
-        border-radius: 8px !important;
-    }
-    
-    .demo-info * {
-        color: var(--text-color) !important;
+        font-weight: 600 !important;
+        margin-bottom: 1rem !important;
     }
     
     /* Status indicators with better text contrast */
@@ -588,41 +543,19 @@ def main():
         text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
     }
     
-    /* Category tags with enhanced styling for both modes */
+    /* Category tags with proper text colors */
     .category-tag {
         color: var(--text-color) !important;
         background: var(--secondary-bg) !important;
         border: 2px solid var(--border-color) !important;
-        font-weight: 500;
-        transition: all 0.3s ease;
+        font-weight: 600 !important;
         box-shadow: 0 2px 4px var(--shadow-color);
     }
     
     .category-tag:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px var(--shadow-color);
-        background: var(--primary-color) !important;
-        color: #ffffff !important;
-        border-color: var(--primary-color) !important;
-    }
-    
-    /* Description section styling */
-    .description-section {
-        background: var(--secondary-bg);
-        padding: 2rem;
-        border-radius: 15px;
-        margin: 2rem 0;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 4px 15px var(--shadow-color);
-    }
-    
-    .description-section h3 {
-        color: var(--text-color) !important;
-        text-shadow: none;
-    }
-    
-    .description-section p {
-        color: var(--text-secondary) !important;
+        background: var(--text-color) !important;
+        color: var(--secondary-bg) !important;
+        border-color: var(--text-color) !important;
     }
     
     /* Technical details section */
@@ -657,8 +590,8 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Always show demo mode status at startup for safety
-    if True:  # Always demo mode at startup
+    # Show model status
+    if MODEL_STATUS == "demo_mode":
         st.markdown("""
         <div class="status-demo">
             🎭 <strong>Demo Mode Active</strong> - TensorFlow not available, showing simulated results
@@ -673,11 +606,11 @@ def main():
     
     # Description and categories
     st.markdown("""
-    <div class="description-section custom-text" style="text-align: center; margin: 2rem 0;">
-        <h3 style="color: var(--text-color) !important; font-weight: 600; margin-bottom: 1rem; font-size: 1.8rem;">
+    <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: var(--secondary-bg); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow-color);" class="custom-text">
+        <h3 style="color: var(--text-color) !important; font-weight: 700; margin-bottom: 1rem; font-size: 1.8rem;">
             🧠 Advanced Image Classification with Deep Learning
         </h3>
-        <p style="font-size: 1.1rem; color: var(--text-secondary) !important; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+        <p style="font-size: 1.1rem; color: var(--text-secondary) !important; line-height: 1.6; margin: 0;">
             Upload any image and our AI will classify it using state-of-the-art MobileNetV2 architecture
         </p>
     </div>
@@ -695,54 +628,54 @@ def main():
     
     # Sidebar information
     with st.sidebar:
-        st.markdown("### 🔧 Model Information")
+        st.markdown("""
+        <h3 style="color: var(--text-color) !important; font-weight: 700 !important; margin-bottom: 1rem !important; font-size: 1.2rem;">
+            🔧 Model Information
+        </h3>
+        """, unsafe_allow_html=True)
+        
         st.markdown(f"""
-        <div class="info-box sidebar-info">
-            <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
-                <strong style="color: var(--text-color) !important;">🏗️ Architecture:</strong> 
-                <span style="color: var(--text-secondary) !important;">MobileNetV2 + Custom Layers</span>
-            </div>
-            <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
-                <strong style="color: var(--text-color) !important;">📊 Accuracy:</strong> 
-                <span style="color: var(--text-secondary) !important;">>91%</span>
-            </div>
-            <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
-                <strong style="color: var(--text-color) !important;">📁 Dataset:</strong> 
-                <span style="color: var(--text-secondary) !important;">Intel Image Classification</span>
-            </div>
-            <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
-                <strong style="color: var(--text-color) !important;">🎯 Classes:</strong> 
-                <span style="color: var(--text-secondary) !important;">{len(labels)} categories</span>
-            </div>
-            <div style="margin: 0.5rem 0; color: var(--text-color) !important;">
-                <strong style="color: var(--text-color) !important;">⚡ Status:</strong> 
-                <span style="color: var(--warning-color) !important; font-weight: 600;">Demo Mode</span>
+        <div class="info-box" style="background: var(--secondary-bg) !important; color: var(--text-color) !important;">
+            <div style="color: var(--text-color) !important; font-size: 0.95rem; line-height: 1.8;">
+                <strong style="color: var(--text-color) !important; font-weight: 700;">🏗️ Architecture:</strong> 
+                <span style="color: var(--text-secondary) !important;">MobileNetV2 + Custom Layers</span><br>
+                <strong style="color: var(--text-color) !important; font-weight: 700;">📊 Accuracy:</strong> 
+                <span style="color: var(--text-secondary) !important;">>91%</span><br>
+                <strong style="color: var(--text-color) !important; font-weight: 700;">📁 Dataset:</strong> 
+                <span style="color: var(--text-secondary) !important;">Intel Image Classification</span><br>
+                <strong style="color: var(--text-color) !important; font-weight: 700;">🎯 Classes:</strong> 
+                <span style="color: var(--text-secondary) !important;">{len(labels)} categories</span><br>
+                <strong style="color: var(--text-color) !important; font-weight: 700;">⚡ Status:</strong> 
+                <span style="color: var(--text-secondary) !important;">{MODEL_STATUS.replace('_', ' ').title()}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("### 📂 Classification Categories")
-        categories_text = ""
+        st.markdown("""
+        <h3 style="color: var(--text-color) !important; font-weight: 700 !important; margin: 1.5rem 0 1rem 0 !important; font-size: 1.2rem;">
+            📂 Classification Categories
+        </h3>
+        """, unsafe_allow_html=True)
+        
+        # Build categories list as a single clean HTML string
+        categories_list = ""
         for i, label in enumerate(labels, 1):
-            categories_text += f'<div style="margin: 0.5rem 0; padding: 0.3rem 0; color: var(--text-color) !important;"><strong style="color: var(--text-color) !important;">{i}.</strong> <span style="color: var(--text-color) !important;">{label.title()}</span></div>'
+            categories_list += f"<strong style='color: var(--text-color) !important; font-weight: 700;'>{i}.</strong> <span style='color: var(--text-secondary) !important; font-weight: 500;'>{label.title()}</span><br>"
         
         st.markdown(f"""
-        <div class="info-box sidebar-categories">
-            {categories_text}
+        <div class="info-box" style="background: var(--secondary-bg) !important; color: var(--text-color) !important;">
+            <div style="color: var(--text-color) !important; font-size: 0.95rem; line-height: 1.8;">
+                {categories_list}
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        if True:  # Always show demo info at startup
+        if MODEL_STATUS == "demo_mode":
             st.markdown("### ℹ️ Demo Mode Info")
             st.markdown("""
-            <div class="info-box demo-info">
-                <div style="color: var(--text-color) !important; line-height: 1.5;">
-                    <strong style="color: var(--warning-color) !important;">🎭 Demo Mode Active</strong><br>
-                    <span style="color: var(--text-secondary) !important;">
-                    TensorFlow is not available in this environment. The app will show simulated predictions 
-                    to demonstrate the UI and functionality.
-                    </span>
-                </div>
+            <div class="info-box">
+                Running in demo mode because TensorFlow is not available in this environment. 
+                The app will show simulated predictions to demonstrate the UI and functionality.
             </div>
             """, unsafe_allow_html=True)
     
@@ -842,7 +775,7 @@ def main():
                             <span style="color: var(--text-secondary) !important;">
                             • Architecture: MobileNetV2<br>
                             • Classes: {len(labels)}<br>
-                            • Backend: Demo Mode
+                            • Backend: {MODEL_STATUS.replace('_', ' ').title()}
                             </span>
                         </div>
                         """
@@ -854,7 +787,12 @@ def main():
     
     # Footer
     st.markdown("---")
-    backend_info = "Demo Mode (Simulated)"
+    backend_info = MODEL_STATUS.replace('_', ' ').title()
+    if MODEL_STATUS == "demo_mode":
+        backend_info += " (Simulated)"
+    
+    # Get app info for footer
+    app_info = get_app_info()
     
     st.markdown(f"""
     <div class="footer-section custom-text">
@@ -867,8 +805,26 @@ def main():
         <p class="footer-secondary" style="margin: 0; font-size: 0.9rem;">
             🎯 Built for intelligent image classification and computer vision tasks
         </p>
+        <p class="footer-secondary" style="margin: 0.5rem 0 0 0; font-size: 0.8rem; opacity: 0.6;">
+            v{app_info['version']} | Python {app_info['python_version']} | Streamlit {app_info['streamlit_version']}
+        </p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Add analytics (non-intrusive)
+    add_footer_analytics()
 
 if __name__ == "__main__":
-    main() 
+    try:
+        main()
+    except Exception as e:
+        # Production error handling
+        st.error("🚨 An unexpected error occurred. Please refresh the page or try again later.")
+        
+        # Log error details for debugging (only in development)
+        if os.getenv('STREAMLIT_ENV') == 'development':
+            st.exception(e)
+        else:
+            # In production, log to system but don't show user sensitive info
+            import logging
+            logging.error(f"CLASSIFIT App Error: {str(e)}", exc_info=True) 

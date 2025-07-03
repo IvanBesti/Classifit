@@ -9,24 +9,31 @@ TF_AVAILABLE = False
 INTERPRETER = None
 
 def initialize_model():
-    """Initialize TensorFlow model with comprehensive error handling"""
+    """Initialize TensorFlow model with fast fallback for deployment"""
     global TF_AVAILABLE, INTERPRETER
     
-    # First, try tflite-runtime (lighter for deployment)
+    # Quick check for deployment environment
+    is_deployment = os.getenv('STREAMLIT_SHARING_MODE') or os.getenv('STREAMLIT_CLOUD')
+    
+    # In deployment, prefer demo mode for faster startup
+    if is_deployment:
+        return "demo_mode"
+    
+    # For local development, try to load model
     try:
-        import tflite_runtime.interpreter as tflite
-        model_path = "tflite/model.tflite"
-        
-        if os.path.exists(model_path):
-            INTERPRETER = tflite.Interpreter(model_path=model_path)
-            INTERPRETER.allocate_tensors()
-            TF_AVAILABLE = True
-            return "tflite_runtime"
-        else:
-            st.warning(f"Model file not found at {model_path}")
-            return "demo_mode"
+        # First, try tflite-runtime (lighter)
+        try:
+            import tflite_runtime.interpreter as tflite
+            model_path = "tflite/model.tflite"
             
-    except ImportError:
+            if os.path.exists(model_path):
+                INTERPRETER = tflite.Interpreter(model_path=model_path)
+                INTERPRETER.allocate_tensors()
+                TF_AVAILABLE = True
+                return "tflite_runtime"
+        except ImportError:
+            pass
+        
         # Fallback to tensorflow.lite
         try:
             import tensorflow as tf
@@ -37,19 +44,17 @@ def initialize_model():
                 INTERPRETER.allocate_tensors()
                 TF_AVAILABLE = True
                 return "tensorflow"
-            else:
-                st.warning(f"Model file not found at {model_path}")
-                return "demo_mode"
-                
         except ImportError:
-            return "demo_mode"
+            pass
             
-    except Exception as e:
-        st.warning(f"Model loading error: {str(e)}")
-        return "demo_mode"
+    except Exception:
+        pass
+    
+    # Default to demo mode
+    return "demo_mode"
 
-# Initialize model at startup
-MODEL_STATUS = initialize_model()
+# Initialize model status (lazy loading to avoid blocking)
+MODEL_STATUS = None
 
 # Set page config with production optimizations
 st.set_page_config(
@@ -213,19 +218,19 @@ def get_confidence_color(confidence):
         return "confidence-low"
 
 @st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes
-def get_app_info():
+def get_app_info(backend_status):
     """Get application information for production monitoring"""
     return {
         "version": "2.0.0",
-        "ml_backend": MODEL_STATUS,
+        "ml_backend": backend_status,
         "python_version": sys.version.split()[0],
         "platform": sys.platform,
         "streamlit_version": st.__version__
     }
 
-def add_footer_analytics():
+def add_footer_analytics(backend_status):
     """Add analytics and footer information"""
-    app_info = get_app_info()
+    app_info = get_app_info(backend_status)
     
     # Add some basic analytics (non-intrusive)
     st.markdown("""
@@ -240,8 +245,18 @@ def add_footer_analytics():
     </script>
     """, unsafe_allow_html=True)
 
+def get_model_status():
+    """Get model status with lazy initialization"""
+    global MODEL_STATUS
+    if MODEL_STATUS is None:
+        MODEL_STATUS = initialize_model()
+    return MODEL_STATUS
+
 def main():
     """Main application function with production optimizations"""
+    
+    # Initialize model status lazily
+    model_status = get_model_status()
     
     # Enhanced CSS with perfect dark/light mode text support
     st.markdown("""
@@ -591,10 +606,10 @@ def main():
     """, unsafe_allow_html=True)
     
     # Show model status
-    if MODEL_STATUS == "demo_mode":
+    if model_status == "demo_mode":
         st.markdown("""
         <div class="status-demo">
-            🎭 <strong>Demo Mode Active</strong> - TensorFlow not available, showing simulated results
+            🎭 <strong>Demo Mode Active</strong> - Showing simulated results for demonstration
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -646,7 +661,7 @@ def main():
                 <strong style="color: var(--text-color) !important; font-weight: 700;">🎯 Classes:</strong> 
                 <span style="color: var(--text-secondary) !important;">{len(labels)} categories</span><br>
                 <strong style="color: var(--text-color) !important; font-weight: 700;">⚡ Status:</strong> 
-                <span style="color: var(--text-secondary) !important;">{MODEL_STATUS.replace('_', ' ').title()}</span>
+                <span style="color: var(--text-secondary) !important;">{model_status.replace('_', ' ').title()}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -670,7 +685,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        if MODEL_STATUS == "demo_mode":
+        if model_status == "demo_mode":
             st.markdown("### ℹ️ Demo Mode Info")
             st.markdown("""
             <div class="info-box">
@@ -787,7 +802,7 @@ def main():
                             <span style="color: var(--text-secondary) !important;">
                             • Architecture: MobileNetV2<br>
                             • Classes: {len(labels)}<br>
-                            • Backend: {MODEL_STATUS.replace('_', ' ').title()}
+                            • Backend: {model_status.replace('_', ' ').title()}
                             </span>
                         </div>
                         """
@@ -799,12 +814,12 @@ def main():
     
     # Footer
     st.markdown("---")
-    backend_info = MODEL_STATUS.replace('_', ' ').title()
-    if MODEL_STATUS == "demo_mode":
+    backend_info = model_status.replace('_', ' ').title()
+    if model_status == "demo_mode":
         backend_info += " (Simulated)"
     
     # Get app info for footer
-    app_info = get_app_info()
+    app_info = get_app_info(model_status)
     
     st.markdown(f"""
     <div class="footer-section custom-text">
@@ -824,7 +839,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # Add analytics (non-intrusive)
-    add_footer_analytics()
+    add_footer_analytics(model_status)
 
 if __name__ == "__main__":
     try:
